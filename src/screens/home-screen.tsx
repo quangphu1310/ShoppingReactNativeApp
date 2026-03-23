@@ -1,26 +1,69 @@
-import { Button, Text, View } from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { RootStackParamList } from "../../App";
+import { Button } from "../components/Button";
+import { logout, selectCurrentUser } from "../slices/auth-slice";
+import { useAppDispatch, useAppSelector } from "../stores/store";
 
-interface HomeSceenProps {
-    navigation: any;
-}
+type HomeScreenProps = NativeStackScreenProps<RootStackParamList, "Home">;
 
-export const HomeScreen: React.FC<HomeSceenProps> = ({ navigation }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+    const dispatch = useAppDispatch();
+    const currentUser = useAppSelector(selectCurrentUser);
+
     return (
-        <View>
-            <Text>Home Screen</Text>
+        <View style={styles.container}>
+            <Text style={styles.title}>Home</Text>
+            <Text style={styles.subtitle}>
+                Welcome{currentUser ? `, ${currentUser.firstName}` : ""}
+            </Text>
+
             <Button
-                title="Go to Demo"
-                onPress={() =>
-                    navigation.navigate('Demo')
-                }
-            />
-            <View style={{ height: 10 }}></View>
-            <Button
+                onPress={() => navigation.navigate("Profile")}
+                style={styles.buttonSpacing}
                 title="Go to Profile"
-                onPress={() =>
-                    navigation.navigate('Profile')
-                }
+            />
+
+            <Button
+                onPress={() => navigation.navigate("Demo")}
+                style={styles.buttonSpacing}
+                title="Go to Demo"
+                variant="secondary"
+            />
+
+            <Button
+                onPress={() => {
+                    dispatch(logout());
+                }}
+                title="Sign Out"
+                variant="outline"
             />
         </View>
     );
-}
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        paddingHorizontal: 16,
+        justifyContent: "center",
+        backgroundColor: "#F9FAFB",
+    },
+    title: {
+        fontSize: 28,
+        fontWeight: "700",
+        color: "#111827",
+        marginBottom: 8,
+        textAlign: "center",
+    },
+    subtitle: {
+        fontSize: 16,
+        color: "#4B5563",
+        textAlign: "center",
+        marginBottom: 20,
+    },
+    buttonSpacing: {
+        marginBottom: 12,
+    },
+});

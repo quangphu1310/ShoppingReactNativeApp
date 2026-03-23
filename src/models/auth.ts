@@ -1,0 +1,35 @@
+export type UserRole = 'user' | 'admin';
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  email: string;
+  age: number;
+  role: UserRole;
+  firstName: string;
+  lastName: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LoginSuccessResponse {
+  status: true;
+  data: {
+    user: AuthUser;
+    token: string;
+  };
+}
+
+export interface LoginErrorResponse {
+  status: false;
+  error: {
+    message: string;
+  };
+}
+
+export type LoginResponse = LoginSuccessResponse | LoginErrorResponse;
