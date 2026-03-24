@@ -88,10 +88,13 @@ export const getCurrentUser = createAsyncThunk<
   { rejectValue: string }
 >('auth/getCurrentUser', async (token, { dispatch, rejectWithValue }) => {
   try {
-    const result: GetCurrentUserResponse = await apiService.getCurrentUser(token);
+    const result: GetCurrentUserResponse = await apiService.getCurrentUser(
+      token,
+    );
 
     if (!result.status) {
-      const errorMessage = getApiErrorMessage(result) ?? 'Failed to fetch profile.';
+      const errorMessage =
+        getApiErrorMessage(result) ?? 'Failed to fetch profile.';
       return rejectWithValue(errorMessage);
     }
 
@@ -108,7 +111,10 @@ export const getCurrentUser = createAsyncThunk<
         try {
           await ProfileRepository.clearProfile();
         } catch (storageError) {
-          console.error('Failed to clear profile after auth error:', storageError);
+          console.error(
+            'Failed to clear profile after auth error:',
+            storageError,
+          );
         }
 
         dispatch(logout());
@@ -175,17 +181,21 @@ const authSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(getCurrentUser.fulfilled, (state, action: PayloadAction<AuthUser>) => {
-        state.loading = false;
-        state.currentUser = action.payload;
-        state.isAuthenticated = true;
-        state.error = null;
-      })
+      .addCase(
+        getCurrentUser.fulfilled,
+        (state, action: PayloadAction<AuthUser>) => {
+          state.loading = false;
+          state.currentUser = action.payload;
+          state.isAuthenticated = true;
+          state.error = null;
+        },
+      )
       .addCase(getCurrentUser.rejected, (state, action) => {
         state.loading = false;
         state.currentUser = null;
         state.isAuthenticated = false;
-        state.error = action.payload ?? action.error.message ?? 'Failed to fetch profile.';
+        state.error =
+          action.payload ?? action.error.message ?? 'Failed to fetch profile.';
       })
       .addCase(logoutUser.pending, state => {
         state.loading = true;
@@ -196,7 +206,8 @@ const authSlice = createSlice({
       })
       .addCase(logoutUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload ?? action.error.message ?? 'Logout failed.';
+        state.error =
+          action.payload ?? action.error.message ?? 'Logout failed.';
       });
   },
 });
