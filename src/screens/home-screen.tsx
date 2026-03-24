@@ -33,6 +33,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             />
 
             <Button
+                onPress={() => navigation.navigate("OrderHistory")}
+                style={styles.buttonSpacing}
+                title="Go to Order History"
+                variant="secondary"
+            />
+
+            <Button
+                onPress={() => navigation.navigate("Checkout")}
+                style={styles.buttonSpacing}
+                title="Go to Checkout"
+                variant="secondary"
+            />
+
+            <Button
                 onPress={() => {
                     dispatch(logout());
                 }}

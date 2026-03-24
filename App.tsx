@@ -4,7 +4,9 @@ import React from "react";
 import { Provider } from "react-redux";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { DemoScreen } from "./src/screens/demo-screen";
+import { CheckoutScreen } from "./src/screens/checkout-screen";
 import { HomeScreen } from "./src/screens/home-screen";
+import { OrderHistoryScreen } from "./src/screens/order-history-screen";
 import { ProfileScreen } from "./src/screens/profile-screen";
 import { SignInScreen } from "./src/screens/sign-in-screen";
 import { selectIsAuthenticated } from "./src/slices/auth-slice";
@@ -14,6 +16,8 @@ export type RootStackParamList = {
   SignIn: undefined;
   Home: undefined;
   Profile: undefined;
+  OrderHistory: undefined;
+  Checkout: undefined;
   Demo: undefined;
 };
 
@@ -41,12 +45,22 @@ const AppNavigator: React.FC = () => {
             <Stack.Screen
               name="Profile"
               component={ProfileScreen}
-              options={{ title: "Profile Screen" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="Demo"
               component={DemoScreen}
               options={{ title: "Demo Screen" }}
+            />
+            <Stack.Screen
+              name="OrderHistory"
+              component={OrderHistoryScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Checkout"
+              component={CheckoutScreen}
+              options={{ headerShown: false }}
             />
           </>
         )}

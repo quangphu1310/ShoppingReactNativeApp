@@ -1,16 +1,15 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
+import { DEV_API_HOST, DEV_API_PORT } from 'react-native-dotenv';
 import { LoginRequest, LoginResponse } from '../models/auth';
 
 // For Android real devices, use adb reverse and keep localhost.
 // If you run on Android emulator, switch host to 10.0.2.2.
-const DEV_API_HOST = Platform.OS === 'android' ? 'localhost' : 'localhost';
-const API_BASE_URL = __DEV__
-  ? `http://${DEV_API_HOST}:3000`
+const resolvedApiBaseUrl = __DEV__
+  ? `http://${DEV_API_HOST}:${DEV_API_PORT}`
   : 'https://api.example.com';
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: resolvedApiBaseUrl,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
