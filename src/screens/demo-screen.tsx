@@ -19,9 +19,9 @@ export const DemoScreen: React.FC<IDemoScreen> = ({ navigation }) => {
                     console.log('You tapped the button!');
                 }}
             >
-            <Text>Press Me</Text>
+                <Text>Press Me</Text>
             </Button >
-            <View style={{ height: 10 }}></View>
+            <View style={styles.spacer} />
             <Button
                 onPress={() =>
                     navigation.navigate('Home')
@@ -48,5 +48,8 @@ const styles = StyleSheet.create({
     image: {
         width: 200,
         height: 200,
+    },
+    spacer: {
+        height: 10,
     },
 })

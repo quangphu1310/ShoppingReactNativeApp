@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from "react-native";
 import {
     ArrowLeftOnRectangleIcon,
     ChevronRightIcon,
@@ -15,6 +15,9 @@ import {
 import { RootStackParamList } from "../../App";
 import { BottomTab, BottomTabItem } from "../components/BottomTab";
 import { Header } from "../components/Header";
+import { useLocalProfile } from "../hooks/use-local-profile";
+import { logoutUser } from "../slices/auth-slice";
+import { useAppDispatch } from "../stores/store";
 
 type ProfileScreenProps = NativeStackScreenProps<RootStackParamList, "Profile">;
 
@@ -31,6 +34,9 @@ const renderProfileTabIcon = (_active: boolean, color: string): React.ReactNode 
 );
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
+    const dispatch = useAppDispatch();
+    const { profile, loading } = useLocalProfile();
+
     const handleSettingsPress = useCallback(() => {
         navigation.navigate("Demo");
     }, [navigation]);
@@ -50,6 +56,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     const handleOrderHistoryPress = useCallback(() => {
         navigation.navigate("OrderHistory");
     }, [navigation]);
+
+    const handleLogoutPress = useCallback(async () => {
+        try {
+            await dispatch(logoutUser());
+        } catch (error) {
+            console.error('Failed to clear profile:', error);
+        }
+    }, [dispatch]);
 
     const handleNoopPress = useCallback(() => {
         // UI-only phase: interaction intentionally disabled
@@ -76,6 +90,35 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         },
     ];
 
+    // Display loading spinner while profile is being loaded
+    if (loading) {
+        return (
+            <View style={styles.container}>
+                <Header
+                    leftIcon={<ChevronLeftIcon color="#0F172A" size={24} strokeWidth={2} />}
+                    onRightPress={handleSettingsPress}
+                    rightIcon={<Cog6ToothIcon color="#0F172A" size={24} strokeWidth={2} />}
+                    titleStyle={styles.headerTitle}
+                    title="Profile Settings"
+                    titleColor="#1F2937"
+                />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#0DF2F2" />
+                </View>
+                <BottomTab
+                    activeColor="#0DF2F2"
+                    activeTabKey="profile"
+                    tabs={tabs}
+                />
+            </View>
+        );
+    }
+
+    // Get initials from profile or use default
+    const initials = profile
+        ? `${profile.firstName?.charAt(0) || ''}${profile.lastName?.charAt(0) || ''}`
+        : 'U';
+
     return (
         <View style={styles.container}>
             <Header
@@ -95,7 +138,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                     <View style={styles.avatarWrapper}>
                         <View style={styles.avatarContainer}>
                             <View style={styles.avatar}>
-                                <Text style={styles.avatarInitials}>JD</Text>
+                                <Text style={styles.avatarInitials}>{initials}</Text>
                             </View>
                             <Pressable
                                 accessibilityLabel="Edit avatar"
@@ -108,8 +151,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                         </View>
                     </View>
 
-                    <Text style={styles.nameText}>John Doe</Text>
-                    <Text style={styles.usernameText}>@johndoe_official</Text>
+                    <Text style={styles.nameText}>
+                        {profile ? `${profile.firstName} ${profile.lastName}` : 'Guest User'}
+                    </Text>
+                    <Text style={styles.usernameText}>
+                        {profile ? `@${profile.username}` : '@guest'}
+                    </Text>
 
                     <View style={styles.badgeContainer}>
                         <Text style={styles.badgeText}>PREMIUM MEMBER</Text>
@@ -131,23 +178,31 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                     <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
                         <View style={styles.emailInputContainer}>
-                            <Text style={styles.emailText}>john.doe@example.com</Text>
+                            <Text style={styles.emailText}>
+                                {profile?.email || 'No email'}
+                            </Text>
                         </View>
                     </View>
 
                     <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>FIRST NAME</Text>
-                        <Text style={styles.fieldValue}>John</Text>
+                        <Text style={styles.fieldValue}>
+                            {profile?.firstName || 'N/A'}
+                        </Text>
                     </View>
 
                     <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>LAST NAME</Text>
-                        <Text style={styles.fieldValue}>Doe</Text>
+                        <Text style={styles.fieldValue}>
+                            {profile?.lastName || 'N/A'}
+                        </Text>
                     </View>
 
                     <View style={styles.fieldGroupLast}>
                         <Text style={styles.fieldLabel}>AGE</Text>
-                        <Text style={styles.fieldValue}>28</Text>
+                        <Text style={styles.fieldValue}>
+                            {profile?.age || 'N/A'}
+                        </Text>
                     </View>
                 </View>
 
@@ -169,7 +224,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 <Pressable
                     accessibilityLabel="Logout"
                     accessibilityRole="button"
-                    onPress={handleNoopPress}
+                    onPress={handleLogoutPress}
                     style={[styles.singleActionCard, styles.logoutActionCard]}
                 >
                     <View style={styles.actionLeftGroup}>
@@ -401,5 +456,10 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         fontWeight: "500",
         color: "#EF4444",
+    },
+    loadingContainer: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
     },
 });

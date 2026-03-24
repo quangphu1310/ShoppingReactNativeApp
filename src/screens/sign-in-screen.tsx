@@ -14,7 +14,13 @@ import {
 import { Background } from "../components/Background";
 import { Button } from "../components/Button";
 import { AppTextInput } from "../components/TextInput";
-import { clearAuthError, loginUser, selectAuthError, selectAuthLoading, selectCurrentUser, selectIsAuthenticated } from "../slices/auth-slice";
+import {
+    clearAuthError,
+    getCurrentUser,
+    loginUser,
+    selectAuthError,
+    selectAuthLoading,
+} from "../slices/auth-slice";
 import { useAppDispatch, useAppSelector } from "../stores/store";
 import { RootStackParamList } from "../../App";
 
@@ -35,8 +41,6 @@ export const SignInScreen: React.FC = () => {
     const dispatch = useAppDispatch();
     const loading = useAppSelector(selectAuthLoading);
     const authError = useAppSelector(selectAuthError);
-    const isAuthenticated = useAppSelector(selectIsAuthenticated);
-    const currentUser = useAppSelector(selectCurrentUser);
 
     const [username, setUsername] = useState<string>("johndoe");
     const [password, setPassword] = useState<string>("secret123");
@@ -94,7 +98,21 @@ export const SignInScreen: React.FC = () => {
         );
 
         if (loginUser.fulfilled.match(resultAction)) {
-            navigation.replace("Home");
+            const profileResultAction = await dispatch(
+                getCurrentUser(resultAction.payload.token)
+            );
+
+            if (getCurrentUser.fulfilled.match(profileResultAction)) {
+                navigation.replace("Home");
+                return;
+            }
+
+            const profileErrorMessage =
+                profileResultAction.payload ??
+                profileResultAction.error?.message ??
+                "Unable to load profile. Please try again.";
+
+            setFormError(profileErrorMessage);
         }
     }, [dispatch, loading, navigation, password, username]);
 
@@ -149,9 +167,6 @@ export const SignInScreen: React.FC = () => {
 
                         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
                         {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
-                        {isAuthenticated && currentUser ? (
-                            <Text style={styles.successText}>Signed in as {currentUser.username}</Text>
-                        ) : null}
 
                         <TouchableOpacity onPress={onForgotPasswordPress}>
                             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>

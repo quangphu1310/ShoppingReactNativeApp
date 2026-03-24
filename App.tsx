@@ -1,6 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import React from "react";
+import React, { useEffect } from "react";
 import { Provider } from "react-redux";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { DemoScreen } from "./src/screens/demo-screen";
@@ -9,8 +9,14 @@ import { HomeScreen } from "./src/screens/home-screen";
 import { OrderHistoryScreen } from "./src/screens/order-history-screen";
 import { ProfileScreen } from "./src/screens/profile-screen";
 import { SignInScreen } from "./src/screens/sign-in-screen";
-import { selectIsAuthenticated } from "./src/slices/auth-slice";
-import store, { useAppSelector } from "./src/stores/store";
+import {
+  getCurrentUser,
+  selectAuthToken,
+  selectCurrentUser,
+  selectIsAuthenticated,
+} from "./src/slices/auth-slice";
+import store, { useAppDispatch, useAppSelector } from "./src/stores/store";
+import { initializeDatabase } from "./src/services/storage/sqlite";
 
 export type RootStackParamList = {
   SignIn: undefined;
@@ -24,7 +30,18 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const AppNavigator: React.FC = () => {
+  const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const token = useAppSelector(selectAuthToken);
+  const currentUser = useAppSelector(selectCurrentUser);
+
+  useEffect(() => {
+    if (!token || currentUser) {
+      return;
+    }
+
+    dispatch(getCurrentUser(token));
+  }, [currentUser, dispatch, token]);
 
   return (
     <NavigationContainer>
@@ -70,6 +87,13 @@ const AppNavigator: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  useEffect(() => {
+    // Initialize SQLite database on app start
+    initializeDatabase().catch((error) => {
+      console.error('Failed to initialize database on app start:', error);
+    });
+  }, []);
+
   return (
     <Provider store={store}>
       <SafeAreaProvider>

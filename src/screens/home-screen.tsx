@@ -3,20 +3,21 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { RootStackParamList } from "../../App";
 import { Button } from "../components/Button";
-import { logout, selectCurrentUser } from "../slices/auth-slice";
-import { useAppDispatch, useAppSelector } from "../stores/store";
+import { logoutUser } from "../slices/auth-slice";
+import { useAppDispatch } from "../stores/store";
+import { useLocalProfile } from "../hooks/use-local-profile";
 
 type HomeScreenProps = NativeStackScreenProps<RootStackParamList, "Home">;
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const dispatch = useAppDispatch();
-    const currentUser = useAppSelector(selectCurrentUser);
+    const { profile } = useLocalProfile();
 
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Home</Text>
             <Text style={styles.subtitle}>
-                Welcome{currentUser ? `, ${currentUser.firstName}` : ""}
+                Welcome{profile ? `, ${profile.firstName}` : ""}
             </Text>
 
             <Button
@@ -47,8 +48,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             />
 
             <Button
-                onPress={() => {
-                    dispatch(logout());
+                onPress={async () => {
+                    await dispatch(logoutUser());
                 }}
                 title="Sign Out"
                 variant="outline"

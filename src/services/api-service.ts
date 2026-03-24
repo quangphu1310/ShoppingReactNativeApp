@@ -1,6 +1,10 @@
 import axios from 'axios';
 import { DEV_API_HOST, DEV_API_PORT } from 'react-native-dotenv';
-import { LoginRequest, LoginResponse } from '../models/auth';
+import {
+  GetCurrentUserResponse,
+  LoginRequest,
+  LoginResponse,
+} from '../models/auth';
 
 // For Android real devices, use adb reverse and keep localhost.
 // If you run on Android emulator, switch host to 10.0.2.2.
@@ -13,7 +17,7 @@ const apiClient = axios.create({
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
-  },
+  }, 
 });
 
 export const apiService = {
@@ -22,6 +26,16 @@ export const apiService = {
     const response = await apiClient.post<LoginResponse>('/login', {
       username: payload.username,
       password: payload.password,
+    });
+
+    return response.data;
+  },
+  getCurrentUser: async (token: string): Promise<GetCurrentUserResponse> => {
+    const response = await apiClient.get<GetCurrentUserResponse>('/user/', {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     return response.data;

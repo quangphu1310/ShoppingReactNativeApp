@@ -33,3 +33,21 @@ export interface LoginErrorResponse {
 }
 
 export type LoginResponse = LoginSuccessResponse | LoginErrorResponse;
+
+export interface GetCurrentUserSuccessResponse {
+  status: true;
+  data: AuthUser;
+}
+
+export interface GetCurrentUserErrorResponse {
+  status: false;
+  error:
+    | {
+        message?: string;
+      }
+    | string;
+}
+
+export type GetCurrentUserResponse =
+  | GetCurrentUserSuccessResponse
+  | GetCurrentUserErrorResponse;

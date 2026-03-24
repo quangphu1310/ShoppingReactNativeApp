@@ -28,26 +28,29 @@ jest.mock('../slices/auth-slice', () => {
         }
     );
 
+    const getCurrentUserThunk = Object.assign(
+        jest.fn((token: string) => ({
+            type: 'auth/getCurrentUser',
+            payload: token,
+        })),
+        {
+            fulfilled: {
+                match: (action: { type: string }) => action.type === 'auth/getCurrentUser/fulfilled',
+            },
+        }
+    );
+
     return {
         clearAuthError: clearAuthErrorAction,
+        getCurrentUser: getCurrentUserThunk,
         loginUser: loginUserThunk,
         selectAuthLoading: (state: { auth: { loading: boolean } }) => state.auth.loading,
         selectAuthError: (state: { auth: { error: string | null } }) => state.auth.error,
-        selectCurrentUser: (state: { auth: { user: MockAuthState['user'] } }) => state.auth.user,
         selectIsAuthenticated: (state: { auth: { isAuthenticated: boolean } }) => state.auth.isAuthenticated,
     };
 });
 
 interface MockAuthState {
-    user: {
-        id: number;
-        username: string;
-        email: string;
-        age: number;
-        role: 'user' | 'admin';
-        firstName: string;
-        lastName: string;
-    } | null;
     token: string | null;
     loading: boolean;
     error: string | null;
@@ -65,7 +68,6 @@ interface MockRootState {
 
 const createMockState = (authOverrides?: Partial<MockAuthState>): MockRootState => ({
     auth: {
-        user: null,
         token: null,
         loading: false,
         error: null,
@@ -155,6 +157,18 @@ describe('sign-in-screen', () => {
                 token: 'token-123',
             },
         });
+        mockDispatch.mockResolvedValueOnce({
+            type: 'auth/getCurrentUser/fulfilled',
+            payload: {
+                id: 1,
+                username: 'johndoe',
+                email: 'john@example.com',
+                age: 25,
+                role: 'user',
+                firstName: 'John',
+                lastName: 'Doe',
+            },
+        });
 
         render(<SignInScreen />);
 
@@ -177,6 +191,38 @@ describe('sign-in-screen', () => {
 
         await waitFor(() => {
             expect(mockDispatch).toHaveBeenCalledTimes(1);
+        });
+        expect(mockReplace).not.toHaveBeenCalled();
+    });
+
+    it('does not navigate when getCurrentUser is rejected', async () => {
+        mockDispatch.mockResolvedValueOnce({
+            type: 'auth/loginUser/fulfilled',
+            payload: {
+                user: {
+                    id: 1,
+                    username: 'johndoe',
+                    email: 'john@example.com',
+                    age: 25,
+                    role: 'user',
+                    firstName: 'John',
+                    lastName: 'Doe',
+                },
+                token: 'token-123',
+            },
+        });
+        mockDispatch.mockResolvedValueOnce({
+            type: 'auth/getCurrentUser/rejected',
+            payload: 'Token has been invalidated. Please login again.',
+            error: { message: 'Rejected' },
+        });
+
+        render(<SignInScreen />);
+
+        fireEvent.press(screen.getByText('Sign In'));
+
+        await waitFor(() => {
+            expect(screen.getByText('Token has been invalidated. Please login again.')).toBeTruthy();
         });
         expect(mockReplace).not.toHaveBeenCalled();
     });

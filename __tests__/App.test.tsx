@@ -21,6 +21,19 @@ jest.mock('@react-navigation/native-stack', () => ({
   },
 }));
 
+jest.mock('react-native-quick-sqlite', () => ({
+  QuickSQLite: {
+    open: jest.fn(),
+    close: jest.fn(),
+    executeAsync: jest.fn().mockResolvedValue({
+      rows: {
+        length: 0,
+        item: jest.fn(),
+      },
+    }),
+  },
+}));
+
 jest.mock('react-redux', () => ({
   Provider: ({ children }: { children: React.ReactNode }) => children,
   useDispatch: jest.fn(),
@@ -30,6 +43,7 @@ jest.mock('react-redux', () => ({
 jest.mock('../src/stores/store', () => ({
   __esModule: true,
   default: {},
+  useAppDispatch: jest.fn(() => jest.fn()),
   useAppSelector: jest.fn(() => false),
 }));
 

@@ -1,28 +1,52 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import {
+  AuthUser,
+  GetCurrentUserErrorResponse,
+  GetCurrentUserResponse,
   LoginErrorResponse,
   LoginRequest,
   LoginSuccessResponse,
-  AuthUser,
 } from '../models/auth';
 import { RootState } from '../reducers/root-reducer';
 import { apiService } from '../services/api-service';
+import { ProfileRepository } from '../services/storage/profile-repository';
 
 interface AuthState {
-  user: AuthUser | null;
   token: string | null;
+  currentUser: AuthUser | null;
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
 }
 
 const initialState: AuthState = {
-  user: null,
   token: null,
+  currentUser: null,
   loading: false,
   error: null,
   isAuthenticated: false,
+};
+
+const getApiErrorMessage = (errorData: unknown): string | null => {
+  if (!errorData) {
+    return null;
+  }
+
+  if (typeof errorData === 'string') {
+    return errorData;
+  }
+
+  const typedError = errorData as GetCurrentUserErrorResponse;
+  if (typeof typedError.error === 'string') {
+    return typedError.error;
+  }
+
+  if (typedError.error && typeof typedError.error.message === 'string') {
+    return typedError.error.message;
+  }
+
+  return null;
 };
 
 export const loginUser = createAsyncThunk<
@@ -58,13 +82,66 @@ export const loginUser = createAsyncThunk<
   }
 });
 
+export const getCurrentUser = createAsyncThunk<
+  AuthUser,
+  string,
+  { rejectValue: string }
+>('auth/getCurrentUser', async (token, { dispatch, rejectWithValue }) => {
+  try {
+    const result: GetCurrentUserResponse = await apiService.getCurrentUser(token);
+
+    if (!result.status) {
+      const errorMessage = getApiErrorMessage(result) ?? 'Failed to fetch profile.';
+      return rejectWithValue(errorMessage);
+    }
+
+    await ProfileRepository.upsertProfile(result.data);
+    return result.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const statusCode = error.response?.status;
+      const apiErrorMessage = getApiErrorMessage(error.response?.data);
+      const errorMessage =
+        apiErrorMessage ?? error.message ?? 'Failed to fetch profile.';
+
+      if (statusCode === 401 || statusCode === 403) {
+        try {
+          await ProfileRepository.clearProfile();
+        } catch (storageError) {
+          console.error('Failed to clear profile after auth error:', storageError);
+        }
+
+        dispatch(logout());
+      }
+
+      return rejectWithValue(errorMessage);
+    }
+
+    return rejectWithValue('An unexpected error occurred.');
+  }
+});
+
+export const logoutUser = createAsyncThunk<void, void, { rejectValue: string }>(
+  'auth/logoutUser',
+  async (_, { dispatch, rejectWithValue }) => {
+    try {
+      await ProfileRepository.clearProfile();
+      dispatch(logout());
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to clear profile.';
+      return rejectWithValue(errorMessage);
+    }
+  },
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
     logout: state => {
-      state.user = null;
       state.token = null;
+      state.currentUser = null;
       state.isAuthenticated = false;
       state.error = null;
     },
@@ -82,18 +159,44 @@ const authSlice = createSlice({
         loginUser.fulfilled,
         (state, action: PayloadAction<LoginSuccessResponse['data']>) => {
           state.loading = false;
-          state.user = action.payload.user;
           state.token = action.payload.token;
-          state.isAuthenticated = true;
+          state.isAuthenticated = false;
           state.error = null;
         },
       )
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
-        state.user = null;
         state.token = null;
+        state.currentUser = null;
         state.isAuthenticated = false;
         state.error = action.payload ?? action.error.message ?? 'Login failed.';
+      })
+      .addCase(getCurrentUser.pending, state => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getCurrentUser.fulfilled, (state, action: PayloadAction<AuthUser>) => {
+        state.loading = false;
+        state.currentUser = action.payload;
+        state.isAuthenticated = true;
+        state.error = null;
+      })
+      .addCase(getCurrentUser.rejected, (state, action) => {
+        state.loading = false;
+        state.currentUser = null;
+        state.isAuthenticated = false;
+        state.error = action.payload ?? action.error.message ?? 'Failed to fetch profile.';
+      })
+      .addCase(logoutUser.pending, state => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(logoutUser.fulfilled, state => {
+        state.loading = false;
+      })
+      .addCase(logoutUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload ?? action.error.message ?? 'Logout failed.';
       });
   },
 });
@@ -106,9 +209,9 @@ export const selectAuthError = (state: RootState): string | null =>
   state.auth.error;
 export const selectIsAuthenticated = (state: RootState): boolean =>
   state.auth.isAuthenticated;
-export const selectCurrentUser = (state: RootState): AuthUser | null =>
-  state.auth.user;
 export const selectAuthToken = (state: RootState): string | null =>
   state.auth.token;
+export const selectCurrentUser = (state: RootState): AuthUser | null =>
+  state.auth.currentUser;
 
 export default authSlice.reducer;
