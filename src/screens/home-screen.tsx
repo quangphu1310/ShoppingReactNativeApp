@@ -1,6 +1,15 @@
-import React, { useCallback, useMemo, useState, useLayoutEffect } from "react";
+import React, {
+    useCallback,
+    useMemo,
+    useState,
+    useLayoutEffect,
+    useEffect,
+} from "react";
 import {
+    ActivityIndicator,
     FlatList,
+    Pressable,
+    RefreshControl,
     StyleSheet,
     Text,
     TextInput,
@@ -23,94 +32,19 @@ import { CategoryChips, CategoryChip } from "../components/CategoryChips";
 import { DiscoverHeader } from "../components/DiscoverHeader";
 import { BottomTab, BottomTabItem } from "../components/BottomTab";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppDispatch, useAppSelector } from "../stores/store";
+import { resolvedApiBaseUrl } from "../services/api-service";
+import {
+    fetchProducts,
+    selectProductError,
+    selectProductLoading,
+    selectProducts,
+    selectProductSearchQuery,
+    setSearchQuery,
+} from "../slices/product-slice";
 
 type HomeScreenProps = NativeStackScreenProps<RootStackParamList, "Home">;
 
-// Mock product data
-const MOCK_PRODUCTS: Product[] = [
-    {
-        id: "1",
-        title: "Wireless Headphones",
-        category: "Audio",
-        price: 79.99,
-        image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop",
-        isSale: false,
-    },
-    {
-        id: "2",
-        title: "Smart Watch",
-        category: "Electronics",
-        price: 199.99,
-        image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop",
-        isSale: true,
-    },
-    {
-        id: "3",
-        title: "Portable Charger",
-        category: "Accessories",
-        price: 49.99,
-        image: "https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=400&h=300&fit=crop",
-        isSale: false,
-    },
-    {
-        id: "4",
-        title: "USB-C Cable",
-        category: "Cables",
-        price: 19.99,
-        image: "https://images.unsplash.com/photo-1625948515291-69613efd103f?w=400&h=300&fit=crop",
-        isSale: true,
-    },
-    {
-        id: "5",
-        title: "Bluetooth Speaker",
-        category: "Audio",
-        price: 89.99,
-        image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&h=300&fit=crop",
-        isSale: false,
-    },
-    {
-        id: "6",
-        title: "Phone Stand",
-        category: "Accessories",
-        price: 29.99,
-        image: "https://images.unsplash.com/photo-1527814050087-3793815479db?w=400&h=300&fit=crop",
-        isSale: true,
-    },
-    {
-        id: "7",
-        title: "Screen Protector",
-        category: "Protection",
-        price: 15.99,
-        image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop",
-        isSale: false,
-    },
-    {
-        id: "8",
-        title: "Car Mount",
-        category: "Accessories",
-        price: 39.99,
-        image: "https://images.unsplash.com/photo-1612198188060-c7c2a3b66eae?w=400&h=300&fit=crop",
-        isSale: false,
-    },
-    {
-        id: "9",
-        title: "Webcam",
-        category: "Electronics",
-        price: 129.99,
-        image: "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=400&h=300&fit=crop",
-        isSale: true,
-    },
-    {
-        id: "10",
-        title: "USB Hub",
-        category: "Accessories",
-        price: 59.99,
-        image: "https://images.unsplash.com/photo-1625948515291-69613efd103f?w=400&h=300&fit=crop",
-        isSale: false,
-    },
-];
-
-// Mock category data
 const MOCK_CATEGORIES: CategoryChip[] = [
     { id: "all", label: "All Items" },
     { id: "audio", label: "Audio" },
@@ -137,9 +71,37 @@ const renderProfileTabIcon = (_active: boolean, color: string): React.ReactNode 
     <UserIcon color={color} size={24} strokeWidth={2} />
 );
 
+const FALLBACK_PRODUCT_IMAGE =
+    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop";
+
+const resolveProductImageUrl = (rawImageUrl: string): string => {
+    const normalized = rawImageUrl.trim();
+
+    if (!normalized) {
+        return FALLBACK_PRODUCT_IMAGE;
+    }
+
+    if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+        return normalized;
+    }
+
+    if (normalized.startsWith("//")) {
+        return `https:${normalized}`;
+    }
+
+    if (normalized.startsWith("/")) {
+        return `${resolvedApiBaseUrl}${normalized}`;
+    }
+
+    return `${resolvedApiBaseUrl}/${normalized}`;
+};
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
-    const [searchQuery, setSearchQuery] = useState("");
-    const [activeCategory, setActiveCategory] = useState("all");
+    const dispatch = useAppDispatch();
+    const searchQuery = useAppSelector(selectProductSearchQuery);
+    const productData = useAppSelector(selectProducts);
+    const productLoading = useAppSelector(selectProductLoading);
+    const productError = useAppSelector(selectProductError);
     const [activeTabKey, setActiveTabKey] = useState("shop");
     const insets = useSafeAreaInsets();
 
@@ -158,9 +120,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         console.log("Wishlist toggled:", productId);
     }, []);
 
-    const handleCategoryPress = useCallback((categoryId: string) => {
-        setActiveCategory(categoryId);
+    const handleCategoryPress = useCallback((_categoryId: string): void => {
+        // Keep category chips as UI mock for now.
     }, []);
+
+    const handleSearchChange = useCallback(
+        (value: string): void => {
+            dispatch(setSearchQuery(value));
+        },
+        [dispatch]
+    );
 
     const handleBellPress = useCallback(() => {
         console.log("Bell pressed");
@@ -170,41 +139,51 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         console.log("Cart pressed");
     }, []);
 
-    // Filter products based on category and search
-    const filteredProducts = useMemo(() => {
-        let filtered = MOCK_PRODUCTS;
-
-        // Filter by category
-        if (activeCategory !== "all") {
-            filtered = filtered.filter(
-                (product) =>
-                    product.category.toLowerCase() === activeCategory.toLowerCase()
+    useEffect(() => {
+        const debounceId = setTimeout(() => {
+            dispatch(
+                fetchProducts({
+                    name: searchQuery.trim() ? searchQuery.trim() : undefined,
+                })
             );
-        }
+        }, 350);
 
-        // Filter by search query
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(
-                (product) =>
-                    product.title.toLowerCase().includes(query) ||
-                    product.category.toLowerCase().includes(query)
-            );
-        }
+        return () => {
+            clearTimeout(debounceId);
+        };
+    }, [dispatch, searchQuery]);
 
-        return filtered;
-    }, [activeCategory, searchQuery]);
+    const products = useMemo<Product[]>(() => {
+        return productData.map((item) => ({
+            id: String(item.id),
+            title: item.name,
+            category: item.priceUnit.toUpperCase(),
+            price: item.price,
+            image: resolveProductImageUrl(item.image),
+            isSale: false,
+        }));
+    }, [productData]);
+
+    const handleRetryPress = useCallback((): void => {
+        dispatch(
+            fetchProducts({
+                name: searchQuery.trim() ? searchQuery.trim() : undefined,
+            })
+        );
+    }, [dispatch, searchQuery]);
 
     const screenWidth = Dimensions.get("window").width;
     const columnWidth = (screenWidth - 16 * 2 - 16) / 2; // 16px padding left/right, 16px gap
 
     const renderProductCard: ListRenderItem<Product> = ({ item }) => (
-        <ProductCard
-            product={item}
-            onAddToCart={handleAddToCart}
-            onWishlistPress={handleWishlistPress}
-            style={{ width: columnWidth }}
-        />
+        <View style={styles.productItemContainer}>
+            <ProductCard
+                product={item}
+                onAddToCart={handleAddToCart}
+                onWishlistPress={handleWishlistPress}
+                style={{ width: columnWidth }}
+            />
+        </View>
     );
 
     const bottomTabItems: BottomTabItem[] = [
@@ -247,11 +226,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
                 <FlatList
-                    data={filteredProducts}
+                    data={products}
                     renderItem={renderProductCard}
                     keyExtractor={(item) => item.id}
                     numColumns={2}
                     columnWrapperStyle={styles.columnWrapper}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={productLoading}
+                            onRefresh={handleRetryPress}
+                        />
+                    }
                     contentContainerStyle={[
                         styles.listContent,
                         {
@@ -280,7 +265,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                                         placeholder="Search products..."
                                         placeholderTextColor="#9CA3AF"
                                         value={searchQuery}
-                                        onChangeText={setSearchQuery}
+                                        onChangeText={handleSearchChange}
                                     />
                                 </View>
                             </View>
@@ -297,7 +282,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     }
                     ListEmptyComponent={
                         <>
-                            <Text style={styles.emptyStateText}>No products found</Text>
+                            {productLoading ? (
+                                <View style={styles.loadingContainer}>
+                                    <ActivityIndicator size="small" color="#0DF2F2" />
+                                    <Text style={styles.loadingText}>Loading products...</Text>
+                                </View>
+                            ) : productError ? (
+                                <View style={styles.errorContainer}>
+                                    <Text style={styles.errorText}>{productError.message}</Text>
+                                    <Pressable
+                                        onPress={handleRetryPress}
+                                        style={styles.retryButton}
+                                    >
+                                        <Text style={styles.retryText}>Try again</Text>
+                                    </Pressable>
+                                </View>
+                            ) : (
+                                <Text style={styles.emptyStateText}>No products found</Text>
+                            )}
                         </>
                     }
                 />
@@ -330,7 +332,9 @@ const styles = StyleSheet.create({
     },
     columnWrapper: {
         gap: 16,
-        marginBottom: 16,
+    },
+    productItemContainer: {
+        marginBottom: 12,
     },
     searchContainer: {
         paddingVertical: 16,
@@ -361,6 +365,43 @@ const styles = StyleSheet.create({
         fontWeight: "500",
         paddingVertical: 48,
         textAlign: "center",
+    },
+    loadingContainer: {
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 48,
+        gap: 8,
+    },
+    loadingText: {
+        fontSize: 14,
+        color: "#6B7280",
+        fontWeight: "500",
+    },
+    errorContainer: {
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 36,
+        paddingHorizontal: 20,
+        gap: 10,
+    },
+    errorText: {
+        fontSize: 14,
+        color: "#DC2626",
+        textAlign: "center",
+        fontWeight: "500",
+    },
+    retryButton: {
+        backgroundColor: "#0DF2F2",
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        minWidth: 96,
+        alignItems: "center",
+    },
+    retryText: {
+        fontSize: 14,
+        color: "#111827",
+        fontWeight: "600",
     },
     bottomTabWrapper: {
         position: "absolute",

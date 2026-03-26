@@ -65,7 +65,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
 
             {/* Content Section */}
             <View style={styles.content}>
-                <Text style={styles.title} numberOfLines={2}>
+                <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
                     {product.title}
                 </Text>
                 <Text style={styles.category} numberOfLines={1}>

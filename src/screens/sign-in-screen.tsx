@@ -1,5 +1,3 @@
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import {
     KeyboardAvoidingView,
@@ -16,13 +14,11 @@ import { Button } from "../components/Button";
 import { AppTextInput } from "../components/TextInput";
 import {
     clearAuthError,
-    getCurrentUser,
     loginUser,
     selectAuthError,
     selectAuthLoading,
 } from "../slices/auth-slice";
 import { useAppDispatch, useAppSelector } from "../stores/store";
-import { RootStackParamList } from "../../App";
 
 const FingerprintIcon: React.FC = () => {
     return (
@@ -37,7 +33,6 @@ const FingerprintIcon: React.FC = () => {
 };
 
 export const SignInScreen: React.FC = () => {
-    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, "SignIn">>();
     const dispatch = useAppDispatch();
     const loading = useAppSelector(selectAuthLoading);
     const authError = useAppSelector(selectAuthError);
@@ -90,31 +85,14 @@ export const SignInScreen: React.FC = () => {
 
         setFormError(null);
 
-        const resultAction = await dispatch(
+        await dispatch(
             loginUser({
                 username: normalizedUsername,
                 password: normalizedPassword,
             })
         );
 
-        if (loginUser.fulfilled.match(resultAction)) {
-            const profileResultAction = await dispatch(
-                getCurrentUser(resultAction.payload.token)
-            );
-
-            if (getCurrentUser.fulfilled.match(profileResultAction)) {
-                navigation.replace("Home");
-                return;
-            }
-
-            const profileErrorMessage =
-                profileResultAction.payload ??
-                profileResultAction.error?.message ??
-                "Unable to load profile. Please try again.";
-
-            setFormError(profileErrorMessage);
-        }
-    }, [dispatch, loading, navigation, password, username]);
+    }, [dispatch, loading, password, username]);
 
     const onForgotPasswordPress = useCallback((): void => {
         setFormError("Forgot password flow is not available yet.");

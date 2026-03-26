@@ -5,10 +5,11 @@ import {
   LoginRequest,
   LoginResponse,
 } from '../models/auth';
+import { GetProductsQuery, GetProductsResponse } from '../models/product';
 
 // For Android real devices, use adb reverse and keep localhost.
 // If you run on Android emulator, switch host to 10.0.2.2.
-const resolvedApiBaseUrl = __DEV__
+export const resolvedApiBaseUrl = __DEV__
   ? `http://${DEV_API_HOST}:${DEV_API_PORT}`
   : 'https://api.example.com';
 
@@ -36,6 +37,20 @@ export const apiService = {
         Accept: 'application/json',
         Authorization: `Bearer ${token}`,
       },
+    });
+
+    return response.data;
+  },
+  getProducts: async (
+    token: string,
+    query?: GetProductsQuery,
+  ): Promise<GetProductsResponse> => {
+    const response = await apiClient.get<GetProductsResponse>('/product', {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      params: query,
     });
 
     return response.data;
