@@ -1,6 +1,5 @@
 import { QuickSQLite } from 'react-native-quick-sqlite';
-
-const DB_NAME = 'shopping_app.db';
+import { DB_NAME } from './db-constants';
 const CURRENT_SCHEMA_VERSION = 1;
 
 let _initialized = false;

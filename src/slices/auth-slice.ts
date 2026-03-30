@@ -3,7 +3,6 @@ import axios from 'axios';
 import {
   AuthErrorMessage,
   AuthUser,
-  GetCurrentUserErrorResponse,
   GetCurrentUserResponse,
   LoginRequest,
   LoginSuccessResponse,
@@ -12,6 +11,7 @@ import { RootState } from '../reducers/root-reducer';
 import { apiService } from '../services/api-service';
 import { ProfileRepository } from '../services/storage/profile-repository';
 import { TokenService } from '../services/storage/token-service';
+import { getApiErrorMessage } from '../utils/api-error';
 
 interface AuthState {
   token: string | null;
@@ -46,26 +46,7 @@ const clearLocalSessionData = async (): Promise<void> => {
   }
 };
 
-const getApiErrorMessage = (errorData: unknown): string | null => {
-  if (!errorData) {
-    return null;
-  }
 
-  if (typeof errorData === 'string') {
-    return errorData;
-  }
-
-  const typedError = errorData as GetCurrentUserErrorResponse;
-  if (typeof typedError.error === 'string') {
-    return typedError.error;
-  }
-
-  if (typedError.error && typeof typedError.error.message === 'string') {
-    return typedError.error.message;
-  }
-
-  return null;
-};
 
 const mapAuthThunkError = (
   error: unknown,

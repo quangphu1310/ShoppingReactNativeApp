@@ -1,7 +1,6 @@
 import { QuickSQLite } from 'react-native-quick-sqlite';
 import { AuthUser } from '../../models/auth';
-
-const DB_NAME = 'shopping_app.db';
+import { DB_NAME } from './db-constants';
 
 /**
  * Repository for managing user profile in SQLite
