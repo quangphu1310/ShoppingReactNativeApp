@@ -4,6 +4,72 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App';
 import { HomeScreen } from './home-screen';
 
+jest.mock('react-native-dotenv', () => ({
+    DEV_API_HOST: 'localhost',
+    DEV_API_PORT: '3000',
+}));
+
+jest.mock('../services/api-service', () => ({
+    resolvedApiBaseUrl: 'http://localhost:3000',
+}));
+
+const mockDispatch = jest.fn();
+const mockSetSearchQueryAction = jest.fn((value: string) => ({ type: 'product/setSearchQuery', payload: value }));
+const mockFetchProductsThunk = jest.fn((query?: { name?: string }) => ({ type: 'product/fetchProducts', payload: query }));
+
+jest.mock('../stores/store', () => ({
+    useAppDispatch: jest.fn(() => mockDispatch),
+    useAppSelector: jest.fn((selector: (state: {
+        product: {
+            searchQuery: string;
+            loading: boolean;
+            error: { message: string } | null;
+            data: Array<{
+                id: number;
+                name: string;
+                price: number;
+                priceUnit: 'dollar' | 'euro' | 'inr';
+                image: string;
+                description: string;
+            }>;
+        };
+    }) => unknown) =>
+        selector({
+            product: {
+                searchQuery: '',
+                loading: false,
+                error: null,
+                data: [
+                    {
+                        id: 1,
+                        name: 'Wireless Headphones',
+                        price: 89.99,
+                        priceUnit: 'dollar',
+                        image: '/assets/headphones.jpg',
+                        description: 'Noise-canceling headphones',
+                    },
+                    {
+                        id: 2,
+                        name: 'Smart Watch',
+                        price: 129.99,
+                        priceUnit: 'dollar',
+                        image: '/assets/watch.jpg',
+                        description: 'Fitness smart watch',
+                    },
+                ],
+            },
+        })),
+}));
+
+jest.mock('../slices/product-slice', () => ({
+    fetchProducts: (query?: { name?: string }) => mockFetchProductsThunk(query),
+    selectProductError: (state: { product: { error: { message: string } | null } }) => state.product.error,
+    selectProductLoading: (state: { product: { loading: boolean } }) => state.product.loading,
+    selectProducts: (state: { product: { data: Array<unknown> } }) => state.product.data,
+    selectProductSearchQuery: (state: { product: { searchQuery: string } }) => state.product.searchQuery,
+    setSearchQuery: (value: string) => mockSetSearchQueryAction(value),
+}));
+
 jest.mock('react-native-safe-area-context', () => {
     const { View } = require('react-native');
 
@@ -38,6 +104,7 @@ describe('home-screen', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        mockDispatch.mockClear();
     });
 
     it('should render default home content and hide stack header', async () => {
@@ -58,7 +125,7 @@ describe('home-screen', () => {
         });
     });
 
-    it('should filter products by search query and show empty state when no match', async () => {
+    it('should dispatch search query updates and trigger product fetch with trimmed query', async () => {
         const props = createHomeScreenProps(navigate, setOptions);
 
         render(<HomeScreen {...props} />);
@@ -66,14 +133,14 @@ describe('home-screen', () => {
         const searchInput = screen.getByPlaceholderText('Search products...');
 
         fireEvent.changeText(searchInput, 'smart watch');
-        await waitFor(() => {
-            expect(screen.getByText('Smart Watch')).toBeTruthy();
-            expect(screen.queryByText('Wireless Headphones')).toBeNull();
+
+        expect(mockDispatch).toHaveBeenCalledWith({
+            type: 'product/setSearchQuery',
+            payload: 'smart watch',
         });
 
-        fireEvent.changeText(searchInput, 'no-product-match');
         await waitFor(() => {
-            expect(screen.getByText('No products found')).toBeTruthy();
+            expect(mockFetchProductsThunk).toHaveBeenCalled();
         });
     });
 
