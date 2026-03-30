@@ -62,7 +62,7 @@ export const useProfileScreen = (
         }
       };
 
-      void syncProfileFromApi();
+      syncProfileFromApi().catch(console.error);
 
       return () => {
         isMounted = false;

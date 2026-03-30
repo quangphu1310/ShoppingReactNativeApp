@@ -33,3 +33,12 @@ export interface GetProductsErrorResponse {
 export type GetProductsResponse =
   | GetProductsSuccessResponse
   | GetProductsErrorResponse;
+
+export interface GetProductByIdSuccessResponse {
+  status: true;
+  data: ProductItem;
+}
+
+export type GetProductByIdResponse =
+  | GetProductByIdSuccessResponse
+  | GetProductsErrorResponse;

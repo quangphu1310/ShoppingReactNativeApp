@@ -24,6 +24,7 @@ export interface ProductCardProps {
     product: Product;
     onAddToCart?: (productId: string) => void;
     onWishlistPress?: (productId: string) => void;
+    onPress?: (productId: string) => void;
     style?: ViewStyle;
 }
 
@@ -31,6 +32,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
     product,
     onAddToCart,
     onWishlistPress,
+    onPress,
     style,
 }) => {
     const handleAddToCart = useCallback(() => {
@@ -41,8 +43,12 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
         onWishlistPress?.(product.id);
     }, [product.id, onWishlistPress]);
 
+    const handlePress = useCallback(() => {
+        onPress?.(product.id);
+    }, [product.id, onPress]);
+
     return (
-        <View style={[styles.card, style]}>
+        <Pressable onPress={handlePress} style={[styles.card, style]}>
             {/* Image Section */}
             <View style={styles.imageContainer}>
                 <Image
@@ -83,7 +89,7 @@ const ProductCardComponent: React.FC<ProductCardProps> = ({
                     </Pressable>
                 </View>
             </View>
-        </View>
+        </Pressable>
     );
 };
 

@@ -19,6 +19,9 @@ interface ProductState {
   loading: boolean;
   error: ProductError | null;
   searchQuery: string;
+  selectedProduct: ProductItem | null;
+  selectedProductLoading: boolean;
+  selectedProductError: ProductError | null;
 }
 
 const initialState: ProductState = {
@@ -26,6 +29,9 @@ const initialState: ProductState = {
   loading: false,
   error: null,
   searchQuery: '',
+  selectedProduct: null,
+  selectedProductLoading: false,
+  selectedProductError: null,
 };
 
 
@@ -72,6 +78,45 @@ export const fetchProducts = createAsyncThunk<
   }
 });
 
+export const fetchProductById = createAsyncThunk<
+  ProductItem,
+  string | number,
+  { state: RootState; rejectValue: ProductError }
+>('product/fetchProductById', async (productId, { getState, rejectWithValue }) => {
+  const token = getState().auth.token;
+
+  if (!token) {
+    return rejectWithValue({
+      message: 'Missing authentication token. Please login again.',
+      statusCode: 401,
+    });
+  }
+
+  try {
+    const result = await apiService.getProductById(token, productId);
+
+    if (!result.status) {
+      return rejectWithValue({
+        message: getApiErrorMessage(result) ?? 'Failed to fetch product details.',
+      });
+    }
+
+    return result.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const statusCode = error.response?.status;
+      const message =
+        getApiErrorMessage(error.response?.data) ??
+        error.message ??
+        'Failed to fetch product details.';
+
+      return rejectWithValue({ message, statusCode });
+    }
+
+    return rejectWithValue({ message: 'An unexpected error occurred.' });
+  }
+});
+
 const productSlice = createSlice({
   name: 'product',
   initialState,
@@ -103,6 +148,25 @@ const productSlice = createSlice({
           ({
             message: action.error.message ?? 'Failed to fetch products.',
           } as ProductError);
+      })
+      .addCase(fetchProductById.pending, state => {
+        state.selectedProductLoading = true;
+        state.selectedProductError = null;
+      })
+      .addCase(
+        fetchProductById.fulfilled,
+        (state, action: PayloadAction<ProductItem>) => {
+          state.selectedProductLoading = false;
+          state.selectedProduct = action.payload;
+        },
+      )
+      .addCase(fetchProductById.rejected, (state, action) => {
+        state.selectedProductLoading = false;
+        state.selectedProductError =
+          action.payload ??
+          ({
+            message: action.error.message ?? 'Failed to fetch product details.',
+          } as ProductError);
       });
   },
 });
@@ -117,5 +181,12 @@ export const selectProductError = (state: RootState): ProductError | null =>
   state.product.error;
 export const selectProductSearchQuery = (state: RootState): string =>
   state.product.searchQuery;
+
+export const selectSelectedProduct = (state: RootState): ProductItem | null =>
+  state.product.selectedProduct;
+export const selectSelectedProductLoading = (state: RootState): boolean =>
+  state.product.selectedProductLoading;
+export const selectSelectedProductError = (state: RootState): ProductError | null =>
+  state.product.selectedProductError;
 
 export default productSlice.reducer;

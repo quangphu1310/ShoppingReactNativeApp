@@ -6,7 +6,7 @@ import {
   LoginResponse,
   LogoutResponse,
 } from '../models/auth';
-import { GetProductsQuery, GetProductsResponse } from '../models/product';
+import { GetProductsQuery, GetProductsResponse, GetProductByIdResponse } from '../models/product';
 
 // For Android real devices, use adb reverse and keep localhost.
 // If you run on Android emulator, switch host to 10.0.2.2.
@@ -15,7 +15,7 @@ export const resolvedApiBaseUrl = __DEV__
   : 'https://api.example.com';
 
 const apiClient = axios.create({
-  baseURL: resolvedApiBaseUrl,
+  baseURL: resolvedApiBaseUrl, 
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -68,6 +68,22 @@ export const apiService = {
       },
       params: query,
     });
+
+    return response.data;
+  },
+  getProductById: async (
+    token: string,
+    productId: string | number,
+  ): Promise<GetProductByIdResponse> => {
+    const response = await apiClient.get<GetProductByIdResponse>(
+      `/product/${productId}`,
+      {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
 
     return response.data;
   },

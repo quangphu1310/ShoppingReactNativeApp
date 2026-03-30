@@ -50,6 +50,10 @@ jest.mock('../src/screens/sign-in-screen', () => ({
   SignInScreen: () => null,
 }));
 
+jest.mock('../src/screens/product-detail-screen', () => ({
+  ProductDetailScreen: () => null,
+}));
+
 jest.mock('react-native-quick-sqlite', () => ({
   QuickSQLite: {
     open: jest.fn(),

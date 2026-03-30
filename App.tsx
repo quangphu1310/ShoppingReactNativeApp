@@ -10,6 +10,7 @@ import { HomeScreen } from "./src/screens/home-screen";
 import { OrderHistoryScreen } from "./src/screens/order-history-screen";
 import { ProfileScreen } from "./src/screens/profile-screen";
 import { SignInScreen } from "./src/screens/sign-in-screen";
+import { ProductDetailScreen } from "./src/screens/product-detail-screen";
 import {
   bootstrapAuthSession,
   selectIsBootstrappingAuth,
@@ -25,6 +26,7 @@ export type RootStackParamList = {
   OrderHistory: undefined;
   Checkout: undefined;
   Demo: undefined;
+  ProductDetails: { id?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -80,6 +82,11 @@ const AppNavigator: React.FC = () => {
             <Stack.Screen
               name="Checkout"
               component={CheckoutScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="ProductDetails"
+              component={ProductDetailScreen}
               options={{ headerShown: false }}
             />
           </>

@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import React from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App';
-import { getCurrentUser, logoutUser } from '../slices/auth-slice';
 import { useAppDispatch, useAppSelector } from '../stores/store';
 import { useLocalProfile } from '../hooks/use-local-profile';
 import { ProfileScreen } from './profile-screen';
@@ -173,7 +172,7 @@ describe('profile-screen', () => {
 
         dispatch
             .mockResolvedValueOnce({ type: 'auth/getCurrentUser/rejected' })
-            .mockResolvedValueOnce({ type: 'auth/logoutUser/fulfilled' });
+            .mockReturnValueOnce({ unwrap: jest.fn().mockResolvedValue(undefined) });
 
         const props = createProfileScreenProps(navigate);
         render(<ProfileScreen {...props} />);

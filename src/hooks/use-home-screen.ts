@@ -40,6 +40,7 @@ export interface UseHomeScreenReturn {
   onRetry: () => void;
   onAddToCart: (productId: string) => void;
   onWishlistPress: (productId: string) => void;
+  onProductPress: (productId: string) => void;
   onCategoryPress: (categoryId: string) => void;
   onBellPress: () => void;
   onCartPress: () => void;
@@ -128,6 +129,10 @@ export const useHomeScreen = (navigation: HomeNavigation): UseHomeScreenReturn =
     console.log('Wishlist toggled:', productId);
   }, []);
 
+  const onProductPress = useCallback((productId: string) => {
+    navigation.navigate('ProductDetails', { id: productId });
+  }, [navigation]);
+
   const onCategoryPress = useCallback((_categoryId: string): void => {
     // Keep category chips as UI mock for now
   }, []);
@@ -188,6 +193,7 @@ export const useHomeScreen = (navigation: HomeNavigation): UseHomeScreenReturn =
     onRetry,
     onAddToCart,
     onWishlistPress,
+    onProductPress,
     onCategoryPress,
     onBellPress,
     onCartPress,

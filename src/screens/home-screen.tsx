@@ -44,6 +44,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     onRetry,
     onAddToCart,
     onWishlistPress,
+    onProductPress,
     onCategoryPress,
     onBellPress,
     onCartPress,
@@ -65,6 +66,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         product={item}
         onAddToCart={onAddToCart}
         onWishlistPress={onWishlistPress}
+        onPress={onProductPress}
         style={{ width: columnWidth }}
       />
     </View>
