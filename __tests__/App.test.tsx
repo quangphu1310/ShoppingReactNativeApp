@@ -48,6 +48,8 @@ jest.mock('../src/stores/store', () => ({
 }));
 
 jest.mock('../src/slices/auth-slice', () => ({
+  bootstrapAuthSession: jest.fn(() => ({ type: 'auth/bootstrapAuthSession' })),
+  selectIsBootstrappingAuth: jest.fn(() => false),
   selectIsAuthenticated: jest.fn(() => false),
 }));
 

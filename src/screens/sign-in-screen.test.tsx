@@ -1,13 +1,8 @@
-import { useNavigation } from '@react-navigation/native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import React from 'react';
 import { clearAuthError } from '../slices/auth-slice';
 import { useAppDispatch, useAppSelector } from '../stores/store';
 import { SignInScreen } from './sign-in-screen';
-
-jest.mock('@react-navigation/native', () => ({
-    useNavigation: jest.fn(),
-}));
 
 jest.mock('../stores/store', () => ({
     useAppDispatch: jest.fn(),
@@ -28,21 +23,8 @@ jest.mock('../slices/auth-slice', () => {
         }
     );
 
-    const getCurrentUserThunk = Object.assign(
-        jest.fn((token: string) => ({
-            type: 'auth/getCurrentUser',
-            payload: token,
-        })),
-        {
-            fulfilled: {
-                match: (action: { type: string }) => action.type === 'auth/getCurrentUser/fulfilled',
-            },
-        }
-    );
-
     return {
         clearAuthError: clearAuthErrorAction,
-        getCurrentUser: getCurrentUserThunk,
         loginUser: loginUserThunk,
         selectAuthLoading: (state: { auth: { loading: boolean } }) => state.auth.loading,
         selectAuthError: (state: { auth: { error: string | null } }) => state.auth.error,
@@ -83,17 +65,12 @@ const createMockState = (authOverrides?: Partial<MockAuthState>): MockRootState 
 
 describe('sign-in-screen', () => {
     const mockDispatch = jest.fn();
-    const mockReplace = jest.fn();
     let mockState: MockRootState;
 
     beforeEach(() => {
         jest.clearAllMocks();
 
         mockState = createMockState();
-
-        (useNavigation as jest.Mock).mockReturnValue({
-            replace: mockReplace,
-        });
 
         (useAppDispatch as jest.Mock).mockReturnValue(mockDispatch);
         (useAppSelector as jest.Mock).mockImplementation(
@@ -141,7 +118,7 @@ describe('sign-in-screen', () => {
         expect(mockDispatch).toHaveBeenCalledWith(clearAuthError());
     });
 
-    it('navigates to Home after successful login', async () => {
+    it('dispatches only login action when login succeeds', async () => {
         mockDispatch.mockResolvedValueOnce({
             type: 'auth/loginUser/fulfilled',
             payload: {
@@ -157,25 +134,13 @@ describe('sign-in-screen', () => {
                 token: 'token-123',
             },
         });
-        mockDispatch.mockResolvedValueOnce({
-            type: 'auth/getCurrentUser/fulfilled',
-            payload: {
-                id: 1,
-                username: 'johndoe',
-                email: 'john@example.com',
-                age: 25,
-                role: 'user',
-                firstName: 'John',
-                lastName: 'Doe',
-            },
-        });
 
         render(<SignInScreen />);
 
         fireEvent.press(screen.getByText('Sign In'));
 
         await waitFor(() => {
-            expect(mockReplace).toHaveBeenCalledWith('Home');
+            expect(mockDispatch).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -192,38 +157,5 @@ describe('sign-in-screen', () => {
         await waitFor(() => {
             expect(mockDispatch).toHaveBeenCalledTimes(1);
         });
-        expect(mockReplace).not.toHaveBeenCalled();
-    });
-
-    it('does not navigate when getCurrentUser is rejected', async () => {
-        mockDispatch.mockResolvedValueOnce({
-            type: 'auth/loginUser/fulfilled',
-            payload: {
-                user: {
-                    id: 1,
-                    username: 'johndoe',
-                    email: 'john@example.com',
-                    age: 25,
-                    role: 'user',
-                    firstName: 'John',
-                    lastName: 'Doe',
-                },
-                token: 'token-123',
-            },
-        });
-        mockDispatch.mockResolvedValueOnce({
-            type: 'auth/getCurrentUser/rejected',
-            payload: 'Token has been invalidated. Please login again.',
-            error: { message: 'Rejected' },
-        });
-
-        render(<SignInScreen />);
-
-        fireEvent.press(screen.getByText('Sign In'));
-
-        await waitFor(() => {
-            expect(screen.getByText('Token has been invalidated. Please login again.')).toBeTruthy();
-        });
-        expect(mockReplace).not.toHaveBeenCalled();
     });
 });

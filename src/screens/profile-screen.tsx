@@ -1,4 +1,5 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from "react-native";
 import {
@@ -16,8 +17,8 @@ import { RootStackParamList } from "../../App";
 import { BottomTab, BottomTabItem } from "../components/BottomTab";
 import { Header } from "../components/Header";
 import { useLocalProfile } from "../hooks/use-local-profile";
-import { logoutUser } from "../slices/auth-slice";
-import { useAppDispatch } from "../stores/store";
+import { getCurrentUser, logoutUser, selectAuthToken } from "../slices/auth-slice";
+import { useAppDispatch, useAppSelector } from "../stores/store";
 
 type ProfileScreenProps = NativeStackScreenProps<RootStackParamList, "Profile">;
 
@@ -35,7 +36,31 @@ const renderProfileTabIcon = (_active: boolean, color: string): React.ReactNode 
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     const dispatch = useAppDispatch();
-    const { profile, loading } = useLocalProfile();
+    const token = useAppSelector(selectAuthToken);
+    const { profile, loading, refetch } = useLocalProfile();
+
+    useFocusEffect(
+        useCallback(() => {
+            let isMounted = true;
+
+            const syncProfileFromApi = async (): Promise<void> => {
+                if (!token) {
+                    return;
+                }
+
+                const action = await dispatch(getCurrentUser(token));
+                if (isMounted && getCurrentUser.fulfilled.match(action)) {
+                    refetch();
+                }
+            };
+
+            void syncProfileFromApi();
+
+            return () => {
+                isMounted = false;
+            };
+        }, [dispatch, refetch, token]),
+    );
 
     const handleSettingsPress = useCallback(() => {
         navigation.navigate("Demo");

@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import React from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App';
-import { logoutUser } from '../slices/auth-slice';
-import { useAppDispatch } from '../stores/store';
+import { getCurrentUser, logoutUser } from '../slices/auth-slice';
+import { useAppDispatch, useAppSelector } from '../stores/store';
 import { useLocalProfile } from '../hooks/use-local-profile';
 import { ProfileScreen } from './profile-screen';
 
@@ -16,10 +16,14 @@ jest.mock('@react-navigation/native', () => ({
         canGoBack: () => true,
         goBack: jest.fn(),
     })),
+    useFocusEffect: (effect: () => void | (() => void)) => {
+        effect();
+    },
 }));
 
 jest.mock('../stores/store', () => ({
     useAppDispatch: jest.fn(),
+    useAppSelector: jest.fn(),
 }));
 
 jest.mock('../hooks/use-local-profile', () => ({
@@ -27,7 +31,17 @@ jest.mock('../hooks/use-local-profile', () => ({
 }));
 
 jest.mock('../slices/auth-slice', () => ({
+    getCurrentUser: Object.assign(
+        jest.fn((token: string) => ({ type: 'auth/getCurrentUser', payload: token })),
+        {
+            fulfilled: {
+                match: (action: { type?: string }) =>
+                    action?.type === 'auth/getCurrentUser/fulfilled',
+            },
+        },
+    ),
     logoutUser: jest.fn(() => ({ type: 'auth/logoutUser' })),
+    selectAuthToken: (state: { auth: { token: string | null } }) => state.auth.token,
 }));
 
 type ProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'Profile'>;
@@ -58,6 +72,10 @@ describe('profile-screen', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         (useAppDispatch as jest.Mock).mockReturnValue(dispatch);
+        (useAppSelector as jest.Mock).mockImplementation((selector: (state: { auth: { token: string | null } }) => unknown) =>
+            selector({ auth: { token: 'token-123' } }),
+        );
+        dispatch.mockResolvedValue({ type: 'auth/getCurrentUser/rejected' });
     });
 
     it('should render loading state when profile is loading', () => {
@@ -143,7 +161,9 @@ describe('profile-screen', () => {
             refetch: jest.fn(),
         });
 
-        dispatch.mockResolvedValue({ type: 'auth/logoutUser/fulfilled' });
+        dispatch
+            .mockResolvedValueOnce({ type: 'auth/getCurrentUser/rejected' })
+            .mockResolvedValueOnce({ type: 'auth/logoutUser/fulfilled' });
 
         const props = createProfileScreenProps(navigate);
         render(<ProfileScreen {...props} />);
@@ -151,6 +171,7 @@ describe('profile-screen', () => {
         fireEvent.press(screen.getByLabelText('Logout'));
 
         await waitFor(() => {
+            expect(getCurrentUser).toHaveBeenCalledWith('token-123');
             expect(logoutUser).toHaveBeenCalledTimes(1);
             expect(dispatch).toHaveBeenCalledWith({ type: 'auth/logoutUser' });
         });

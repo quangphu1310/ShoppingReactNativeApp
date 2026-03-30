@@ -85,12 +85,16 @@ export const SignInScreen: React.FC = () => {
 
         setFormError(null);
 
-        await dispatch(
+        const loginAction = await dispatch(
             loginUser({
                 username: normalizedUsername,
                 password: normalizedPassword,
             })
         );
+
+        if (!loginUser.fulfilled.match(loginAction)) {
+            return;
+        }
 
     }, [dispatch, loading, password, username]);
 

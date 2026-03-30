@@ -11,6 +11,7 @@ import {
 import { RootState } from '../reducers/root-reducer';
 import { apiService } from '../services/api-service';
 import { ProfileRepository } from '../services/storage/profile-repository';
+import { TokenService } from '../services/storage/token-service';
 
 interface AuthState {
   token: string | null;
@@ -18,6 +19,7 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
+  isBootstrapping: boolean;
 }
 
 const initialState: AuthState = {
@@ -26,6 +28,18 @@ const initialState: AuthState = {
   loading: false,
   error: null,
   isAuthenticated: false,
+  isBootstrapping: true,
+};
+
+const clearLocalSessionData = async (): Promise<void> => {
+  const [, clearProfileResult] = await Promise.allSettled([
+    TokenService.clearToken(),
+    ProfileRepository.clearProfile(),
+  ]);
+
+  if (clearProfileResult.status === 'rejected') {
+    throw clearProfileResult.reason;
+  }
 };
 
 const getApiErrorMessage = (errorData: unknown): string | null => {
@@ -59,6 +73,11 @@ export const loginUser = createAsyncThunk<
 
     if (!result.status) {
       return rejectWithValue(result.error.message);
+    }
+
+    const persisted = await TokenService.saveToken(result.data.token);
+    if (!persisted) {
+      return rejectWithValue('Failed to persist auth token.');
     }
 
     return result.data;
@@ -109,10 +128,10 @@ export const getCurrentUser = createAsyncThunk<
 
       if (statusCode === 401 || statusCode === 403) {
         try {
-          await ProfileRepository.clearProfile();
+          await clearLocalSessionData();
         } catch (storageError) {
           console.error(
-            'Failed to clear profile after auth error:',
+            'Failed to clear local session after auth error:',
             storageError,
           );
         }
@@ -131,15 +150,46 @@ export const logoutUser = createAsyncThunk<void, void, { rejectValue: string }>(
   'auth/logoutUser',
   async (_, { dispatch, rejectWithValue }) => {
     try {
-      await ProfileRepository.clearProfile();
+      await clearLocalSessionData();
       dispatch(logout());
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : 'Failed to clear profile.';
+        error instanceof Error
+          ? error.message
+          : 'Failed to clear local session data.';
       return rejectWithValue(errorMessage);
     }
   },
 );
+
+export const bootstrapAuthSession = createAsyncThunk<
+  void,
+  void,
+  { rejectValue: string }
+>('auth/bootstrapAuthSession', async (_, { dispatch, rejectWithValue }) => {
+  try {
+    const token = await TokenService.getToken();
+
+    if (!token) {
+      dispatch(logout());
+      return;
+    }
+
+    dispatch(setAuthToken(token));
+  } catch {
+    try {
+      await clearLocalSessionData();
+    } catch (clearError) {
+      console.error(
+        'Failed to clear local session after bootstrap error:',
+        clearError,
+      );
+    }
+
+    dispatch(logout());
+    return rejectWithValue('Failed to restore user session.');
+  }
+});
 
 const authSlice = createSlice({
   name: 'auth',
@@ -149,6 +199,11 @@ const authSlice = createSlice({
       state.token = null;
       state.currentUser = null;
       state.isAuthenticated = false;
+      state.error = null;
+    },
+    setAuthToken: (state, action: PayloadAction<string>) => {
+      state.token = action.payload;
+      state.isAuthenticated = true;
       state.error = null;
     },
     clearAuthError: state => {
@@ -166,7 +221,7 @@ const authSlice = createSlice({
         (state, action: PayloadAction<LoginSuccessResponse['data']>) => {
           state.loading = false;
           state.token = action.payload.token;
-          state.isAuthenticated = false;
+          state.isAuthenticated = true;
           state.error = null;
         },
       )
@@ -197,6 +252,20 @@ const authSlice = createSlice({
         state.error =
           action.payload ?? action.error.message ?? 'Failed to fetch profile.';
       })
+      .addCase(bootstrapAuthSession.pending, state => {
+        state.isBootstrapping = true;
+        state.error = null;
+      })
+      .addCase(bootstrapAuthSession.fulfilled, state => {
+        state.isBootstrapping = false;
+      })
+      .addCase(bootstrapAuthSession.rejected, (state, action) => {
+        state.isBootstrapping = false;
+        state.error =
+          action.payload ??
+          action.error.message ??
+          'Failed to restore user session.';
+      })
       .addCase(logoutUser.pending, state => {
         state.loading = true;
         state.error = null;
@@ -212,7 +281,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearAuthError } = authSlice.actions;
+export const { logout, setAuthToken, clearAuthError } = authSlice.actions;
 
 export const selectAuthLoading = (state: RootState): boolean =>
   state.auth.loading;
@@ -220,6 +289,8 @@ export const selectAuthError = (state: RootState): string | null =>
   state.auth.error;
 export const selectIsAuthenticated = (state: RootState): boolean =>
   state.auth.isAuthenticated;
+export const selectIsBootstrappingAuth = (state: RootState): boolean =>
+  state.auth.isBootstrapping;
 export const selectAuthToken = (state: RootState): string | null =>
   state.auth.token;
 export const selectCurrentUser = (state: RootState): AuthUser | null =>
