@@ -27,16 +27,20 @@ jest.mock('../slices/auth-slice', () => {
         clearAuthError: clearAuthErrorAction,
         loginUser: loginUserThunk,
         selectAuthLoading: (state: { auth: { loading: boolean } }) => state.auth.loading,
-        selectAuthError: (state: { auth: { error: string | null } }) => state.auth.error,
+        selectAuthError: (state: { auth: { error: { message: string } | null } }) => state.auth.error,
         selectIsAuthenticated: (state: { auth: { isAuthenticated: boolean } }) => state.auth.isAuthenticated,
+        selectAuthToken: (state: { auth: { token: string | null } }) => state.auth.token,
+        selectCurrentUser: () => null,
     };
 });
+
 
 interface MockAuthState {
     token: string | null;
     loading: boolean;
-    error: string | null;
+    error: { message: string } | null;
     isAuthenticated: boolean;
+    currentUser: null;
 }
 
 interface MockRootState {
@@ -54,6 +58,7 @@ const createMockState = (authOverrides?: Partial<MockAuthState>): MockRootState 
         loading: false,
         error: null,
         isAuthenticated: false,
+        currentUser: null,
         ...authOverrides,
     },
     api: {
@@ -62,6 +67,7 @@ const createMockState = (authOverrides?: Partial<MockAuthState>): MockRootState 
         error: null,
     },
 });
+
 
 describe('sign-in-screen', () => {
     const mockDispatch = jest.fn();
@@ -110,13 +116,14 @@ describe('sign-in-screen', () => {
     });
 
     it('dispatches clearAuthError when user edits input and auth error exists', () => {
-        mockState = createMockState({ error: 'Invalid credentials' });
+        mockState = createMockState({ error: { message: 'Invalid credentials' } });
         render(<SignInScreen />);
 
         fireEvent.changeText(screen.getByDisplayValue('johndoe'), 'johnny');
 
         expect(mockDispatch).toHaveBeenCalledWith(clearAuthError());
     });
+
 
     it('dispatches only login action when login succeeds', async () => {
         mockDispatch.mockResolvedValueOnce({

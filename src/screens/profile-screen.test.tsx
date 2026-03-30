@@ -40,9 +40,18 @@ jest.mock('../slices/auth-slice', () => ({
             },
         },
     ),
-    logoutUser: jest.fn(() => ({ type: 'auth/logoutUser' })),
+    logoutUser: Object.assign(
+        jest.fn(() => ({ type: 'auth/logoutUser' })),
+        { unwrap: jest.fn().mockResolvedValue(undefined) },
+    ),
     selectAuthToken: (state: { auth: { token: string | null } }) => state.auth.token,
+    selectCurrentUser: () => null,
+    selectIsAuthenticated: () => false,
+    selectAuthLoading: () => false,
+    selectAuthError: () => null,
+    clearAuthError: jest.fn(() => ({ type: 'auth/clearAuthError' })),
 }));
+
 
 type ProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
