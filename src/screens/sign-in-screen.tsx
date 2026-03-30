@@ -148,7 +148,7 @@ export const SignInScreen: React.FC = () => {
                         />
 
                         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
-                        {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
+                        {authError ? <Text style={styles.errorText}>{authError.message}</Text> : null}
 
                         <TouchableOpacity onPress={onForgotPasswordPress}>
                             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>

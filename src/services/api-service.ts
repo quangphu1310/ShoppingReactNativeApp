@@ -4,6 +4,7 @@ import {
   GetCurrentUserResponse,
   LoginRequest,
   LoginResponse,
+  LogoutResponse,
 } from '../models/auth';
 import { GetProductsQuery, GetProductsResponse } from '../models/product';
 
@@ -38,6 +39,21 @@ export const apiService = {
         Authorization: `Bearer ${token}`,
       },
     });
+
+    return response.data;
+  },
+  logout: async (token: string): Promise<LogoutResponse> => {
+    const response = await apiClient.post<LogoutResponse>(
+      '/logout',
+      {},
+      {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
 
     return response.data;
   },

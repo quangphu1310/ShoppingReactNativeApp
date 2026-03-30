@@ -1,10 +1,10 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import {
+  AuthErrorMessage,
   AuthUser,
   GetCurrentUserErrorResponse,
   GetCurrentUserResponse,
-  LoginErrorResponse,
   LoginRequest,
   LoginSuccessResponse,
 } from '../models/auth';
@@ -17,7 +17,7 @@ interface AuthState {
   token: string | null;
   currentUser: AuthUser | null;
   loading: boolean;
-  error: string | null;
+  error: AuthErrorMessage | null;
   isAuthenticated: boolean;
   isBootstrapping: boolean;
 }
@@ -32,10 +32,14 @@ const initialState: AuthState = {
 };
 
 const clearLocalSessionData = async (): Promise<void> => {
-  const [, clearProfileResult] = await Promise.allSettled([
+  const [clearTokenResult, clearProfileResult] = await Promise.allSettled([
     TokenService.clearToken(),
     ProfileRepository.clearProfile(),
   ]);
+
+  if (clearTokenResult.status === 'rejected' || !clearTokenResult.value) {
+    throw new Error('Failed to clear auth token from local storage.');
+  }
 
   if (clearProfileResult.status === 'rejected') {
     throw clearProfileResult.reason;
@@ -63,48 +67,107 @@ const getApiErrorMessage = (errorData: unknown): string | null => {
   return null;
 };
 
+const mapAuthThunkError = (
+  error: unknown,
+  context?: 'login' | 'logout' | 'bootstrap',
+): AuthErrorMessage => {
+  if (axios.isAxiosError(error)) {
+    const statusCode = error.response?.status;
+    const apiErrorMessage = getApiErrorMessage(error.response?.data);
+
+    if (statusCode === 401 || statusCode === 403) {
+      return {
+        type: 'api',
+        message: 'Unauthorized. Please login again.',
+      };
+    }
+
+    if (statusCode === 400) {
+      return {
+        type: 'api',
+        message: apiErrorMessage ?? 'Invalid request.',
+      };
+    }
+
+    if (statusCode && statusCode >= 500) {
+      return {
+        type: 'api',
+        message: 'Server error. Please try again later.',
+      };
+    }
+
+    if (error.message === 'Network Error') {
+      return {
+        type: 'network',
+        message:
+          context === 'logout'
+            ? 'Network error. Local session cleared anyway.'
+            : 'Cannot reach API. Check your internet connection.',
+      };
+    }
+
+    return {
+      type: 'network',
+      message: apiErrorMessage ?? error.message ?? 'Network error.',
+    };
+  }
+
+  if (error instanceof Error) {
+    if (
+      error.message.includes('Failed to clear') ||
+      error.message.includes('storage')
+    ) {
+      return {
+        type: 'storage',
+        message: error.message,
+      };
+    }
+
+    return {
+      type: 'storage',
+      message: error.message,
+    };
+  }
+
+  return {
+    type: 'api',
+    message: 'An unexpected error occurred.',
+  };
+};
+
 export const loginUser = createAsyncThunk<
   LoginSuccessResponse['data'],
   LoginRequest,
-  { rejectValue: string }
+  { rejectValue: AuthErrorMessage }
 >('auth/loginUser', async (payload, { rejectWithValue }) => {
   try {
     const result = await apiService.login(payload);
 
     if (!result.status) {
-      return rejectWithValue(result.error.message);
+      return rejectWithValue({
+        type: 'api',
+        message: result.error.message,
+      });
     }
 
     const persisted = await TokenService.saveToken(result.data.token);
     if (!persisted) {
-      return rejectWithValue('Failed to persist auth token.');
+      return rejectWithValue({
+        type: 'storage',
+        message: 'Failed to persist auth token.',
+      });
     }
 
     return result.data;
   } catch (error) {
-    if (axios.isAxiosError<LoginErrorResponse>(error)) {
-      if (error.message === 'Network Error') {
-        return rejectWithValue(
-          'Cannot reach API. For Android device, run: adb reverse tcp:3000 tcp:3000',
-        );
-      }
-
-      const errorMessage =
-        error.response?.data?.error?.message ??
-        error.message ??
-        'Login failed.';
-
-      return rejectWithValue(errorMessage);
-    }
-
-    return rejectWithValue('An unexpected error occurred.');
+    return rejectWithValue(mapAuthThunkError(error, 'login'));
   }
 });
 
 export const getCurrentUser = createAsyncThunk<
   AuthUser,
   string,
-  { rejectValue: string }
+  { rejectValue: AuthErrorMessage }
 >('auth/getCurrentUser', async (token, { dispatch, rejectWithValue }) => {
   try {
     const result: GetCurrentUserResponse = await apiService.getCurrentUser(
@@ -114,7 +177,10 @@ export const getCurrentUser = createAsyncThunk<
     if (!result.status) {
       const errorMessage =
         getApiErrorMessage(result) ?? 'Failed to fetch profile.';
-      return rejectWithValue(errorMessage);
+      return rejectWithValue({
+        type: 'api',
+        message: errorMessage,
+      });
     }
 
     await ProfileRepository.upsertProfile(result.data);
@@ -122,9 +188,6 @@ export const getCurrentUser = createAsyncThunk<
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const statusCode = error.response?.status;
-      const apiErrorMessage = getApiErrorMessage(error.response?.data);
-      const errorMessage =
-        apiErrorMessage ?? error.message ?? 'Failed to fetch profile.';
 
       if (statusCode === 401 || statusCode === 403) {
         try {
@@ -138,34 +201,72 @@ export const getCurrentUser = createAsyncThunk<
 
         dispatch(logout());
       }
-
-      return rejectWithValue(errorMessage);
     }
 
-    return rejectWithValue('An unexpected error occurred.');
+    return rejectWithValue(mapAuthThunkError(error, 'bootstrap'));
   }
 });
 
-export const logoutUser = createAsyncThunk<void, void, { rejectValue: string }>(
-  'auth/logoutUser',
-  async (_, { dispatch, rejectWithValue }) => {
-    try {
-      await clearLocalSessionData();
-      dispatch(logout());
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Failed to clear local session data.';
-      return rejectWithValue(errorMessage);
+export const logoutUser = createAsyncThunk<
+  void,
+  void,
+  { rejectValue: AuthErrorMessage }
+>('auth/logoutUser', async (_, { dispatch, getState, rejectWithValue }) => {
+  const token = (getState() as RootState).auth.token;
+  let remoteLogoutError: AuthErrorMessage | null = null;
+
+  try {
+    if (token) {
+      try {
+        const result = await apiService.logout(token);
+
+        if (!result.status) {
+          const apiMessage = getApiErrorMessage(result);
+          if (apiMessage) {
+            remoteLogoutError = {
+              type: 'api',
+              message: apiMessage,
+            };
+          }
+        }
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          const statusCode = error.response?.status;
+
+          // Ignore 401/403 - user is already logged out on backend
+          if (statusCode !== 401 && statusCode !== 403) {
+            remoteLogoutError = mapAuthThunkError(error, 'logout');
+          }
+        } else if (error instanceof Error) {
+          remoteLogoutError = {
+            type: 'api',
+            message: error.message,
+          };
+        }
+      }
     }
-  },
-);
+
+    await clearLocalSessionData();
+    dispatch(logout());
+
+    // If there was a remote error, still return it but note that local cleanup succeeded
+    if (remoteLogoutError) {
+      return rejectWithValue({
+        ...remoteLogoutError,
+        message: `${remoteLogoutError.message} Local session was cleared successfully.`,
+      });
+    }
+  } catch (error) {
+    // If local cleanup fails, we have a critical error
+    dispatch(logout()); // Force logout anyway
+    return rejectWithValue(mapAuthThunkError(error, 'logout'));
+  }
+});
 
 export const bootstrapAuthSession = createAsyncThunk<
   void,
   void,
-  { rejectValue: string }
+  { rejectValue: AuthErrorMessage }
 >('auth/bootstrapAuthSession', async (_, { dispatch, rejectWithValue }) => {
   try {
     const token = await TokenService.getToken();
@@ -175,8 +276,33 @@ export const bootstrapAuthSession = createAsyncThunk<
       return;
     }
 
+    const currentUserAction = await dispatch(getCurrentUser(token));
+    if (!getCurrentUser.fulfilled.match(currentUserAction)) {
+      try {
+        await clearLocalSessionData();
+      } catch (clearError) {
+        console.error(
+          'Failed to clear local session after bootstrap validation error:',
+          clearError,
+        );
+      }
+
+      dispatch(logout());
+
+      // currentUserAction.payload is now AuthErrorMessage
+      const errorPayload = currentUserAction.payload;
+      if (errorPayload) {
+        return rejectWithValue(errorPayload);
+      }
+
+      return rejectWithValue({
+        type: 'api',
+        message: 'Failed to validate saved session.',
+      });
+    }
+
     dispatch(setAuthToken(token));
-  } catch {
+  } catch (error) {
     try {
       await clearLocalSessionData();
     } catch (clearError) {
@@ -187,7 +313,7 @@ export const bootstrapAuthSession = createAsyncThunk<
     }
 
     dispatch(logout());
-    return rejectWithValue('Failed to restore user session.');
+    return rejectWithValue(mapAuthThunkError(error, 'bootstrap'));
   }
 });
 
@@ -230,7 +356,10 @@ const authSlice = createSlice({
         state.token = null;
         state.currentUser = null;
         state.isAuthenticated = false;
-        state.error = action.payload ?? action.error.message ?? 'Login failed.';
+        state.error = action.payload ?? {
+          type: 'api' as const,
+          message: 'Login failed.',
+        };
       })
       .addCase(getCurrentUser.pending, state => {
         state.loading = true;
@@ -241,7 +370,7 @@ const authSlice = createSlice({
         (state, action: PayloadAction<AuthUser>) => {
           state.loading = false;
           state.currentUser = action.payload;
-          state.isAuthenticated = true;
+          state.isAuthenticated = Boolean(state.token);
           state.error = null;
         },
       )
@@ -249,8 +378,10 @@ const authSlice = createSlice({
         state.loading = false;
         state.currentUser = null;
         state.isAuthenticated = false;
-        state.error =
-          action.payload ?? action.error.message ?? 'Failed to fetch profile.';
+        state.error = action.payload ?? {
+          type: 'api' as const,
+          message: 'Failed to fetch profile.',
+        };
       })
       .addCase(bootstrapAuthSession.pending, state => {
         state.isBootstrapping = true;
@@ -261,10 +392,10 @@ const authSlice = createSlice({
       })
       .addCase(bootstrapAuthSession.rejected, (state, action) => {
         state.isBootstrapping = false;
-        state.error =
-          action.payload ??
-          action.error.message ??
-          'Failed to restore user session.';
+        state.error = action.payload ?? {
+          type: 'api' as const,
+          message: 'Failed to restore user session.',
+        };
       })
       .addCase(logoutUser.pending, state => {
         state.loading = true;
@@ -272,11 +403,23 @@ const authSlice = createSlice({
       })
       .addCase(logoutUser.fulfilled, state => {
         state.loading = false;
+        // AC-2 & AC-3: Explicitly clear both token and authenticated flag
+        state.token = null;
+        state.currentUser = null;
+        state.isAuthenticated = false;
+        state.error = null;
       })
       .addCase(logoutUser.rejected, (state, action) => {
         state.loading = false;
-        state.error =
-          action.payload ?? action.error.message ?? 'Logout failed.';
+        // AC-3: Even on logout failure, ensure deterministic cleanup
+        // Token must be cleared, authenticated must be false
+        state.token = null;
+        state.currentUser = null;
+        state.isAuthenticated = false;
+        state.error = action.payload ?? {
+          type: 'api' as const,
+          message: 'Logout failed.',
+        };
       });
   },
 });
@@ -285,7 +428,7 @@ export const { logout, setAuthToken, clearAuthError } = authSlice.actions;
 
 export const selectAuthLoading = (state: RootState): boolean =>
   state.auth.loading;
-export const selectAuthError = (state: RootState): string | null =>
+export const selectAuthError = (state: RootState): AuthErrorMessage | null =>
   state.auth.error;
 export const selectIsAuthenticated = (state: RootState): boolean =>
   state.auth.isAuthenticated;

@@ -51,3 +51,26 @@ export interface GetCurrentUserErrorResponse {
 export type GetCurrentUserResponse =
   | GetCurrentUserSuccessResponse
   | GetCurrentUserErrorResponse;
+
+export interface LogoutSuccessResponse {
+  status: true;
+  data: {
+    message: string;
+  };
+}
+
+export interface LogoutErrorResponse {
+  status: false;
+  error:
+    | {
+        message?: string;
+      }
+    | string;
+}
+
+export type LogoutResponse = LogoutSuccessResponse | LogoutErrorResponse;
+
+export interface AuthErrorMessage {
+  type: 'api' | 'network' | 'storage';
+  message: string;
+}
